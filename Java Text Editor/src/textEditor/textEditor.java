@@ -8,7 +8,6 @@ import java.awt.FileDialog;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
-import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
@@ -23,8 +22,6 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-
-import javax.print.attribute.AttributeSetUtilities;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.JCheckBoxMenuItem;
