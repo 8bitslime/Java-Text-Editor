@@ -1,3 +1,12 @@
+/**
+ * Application Name : Java Text Editor
+ * Author : Zachary Wells
+ * Version : 0.1
+ * Additional Notes : This is a very simple text editor made as a
+ * little side project. There is nothing fancy about this program,
+ * but it's fun to play around with.
+ */
+
 package textEditor;
 
 import java.awt.BorderLayout;
@@ -8,6 +17,7 @@ import java.awt.FileDialog;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
@@ -22,6 +32,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.JCheckBoxMenuItem;
@@ -35,6 +46,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JTextPane;
 import javax.swing.SwingUtilities;
+import javax.swing.undo.UndoManager;
 
 public class textEditor extends JFrame {
 	private static final long serialVersionUID = 1L;
@@ -46,13 +58,14 @@ public class textEditor extends JFrame {
 	private JMenuBar bar;
 	private JMenu file, edit, view;
 	private JMenuItem New, Open, Save, SaveAs; //File Items
-											   //Edit Items
+	private JMenuItem Undo, Redo;			   //File Items
 	private JCheckBoxMenuItem onTop;           //View Items
 	private JLabel XButton, MinButton, MaxButton;
 	
 	private JTextPane text;
-	private Font font = new Font("Verdana", 0, 13);
+	private Font font = new Font("Verdana", 0, 14);
 	
+	private UndoManager undo = new UndoManager();
 	private boolean OnTop = false;
 	private int xoff = 0, yoff = 0, xoffScreen, yoffScreen;
 	
@@ -66,7 +79,6 @@ public class textEditor extends JFrame {
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setTitle(title);
 		setUndecorated(true);
-		setVisible(true);
 		
 		bar = new JMenuBar();
 		bar.setBorder(BorderFactory.createTitledBorder(null, title, 2, 3, font, Color.BLACK));
@@ -164,7 +176,27 @@ public class textEditor extends JFrame {
 		SaveAs = new JMenuItem("Save As"); file.add(SaveAs);
 		SaveAs.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent e) { SaveAs(); } });
 		
-		onTop = new JCheckBoxMenuItem("Always On Top"); view.add(onTop);
+		Undo = new JMenuItem("Undo"); edit.add(Undo); //Edit Items
+		Undo.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				if (undo.canUndo())
+					undo.undo();
+				else
+					Toolkit.getDefaultToolkit().beep();
+			}
+		});
+		Redo = new JMenuItem("Redo"); edit.add(Redo);
+		Redo.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				if (undo.canRedo())
+					undo.redo();
+				else
+					Toolkit.getDefaultToolkit().beep();
+			}
+		});
+		//edit.add(new JSeparator());
+		
+		onTop = new JCheckBoxMenuItem("Always On Top"); view.add(onTop); //View Items
 		onTop.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent e) { toggleOnTop(); } });
 		
 		contentPane = new JPanel();
@@ -176,7 +208,7 @@ public class textEditor extends JFrame {
 		
 		gbc.gridx = 1;
 		gbc.gridy = 1;
-		gbc.fill = gbc.BOTH;
+		gbc.fill = GridBagConstraints.BOTH;
 		gbc.anchor = GridBagConstraints.CENTER;
 		gbc.weightx = 1;
 		gbc.weighty = 1;
@@ -190,6 +222,8 @@ public class textEditor extends JFrame {
 		JScrollPane scroll = new JScrollPane(noWrap);
 		scroll.setBorder(null);
 		contentPane.add(scroll, gbc);
+		
+	    text.getDocument().addUndoableEditListener(undo);
 		
 		gbc.gridx = 0;
 		gbc.gridy = 1;
@@ -239,6 +273,9 @@ public class textEditor extends JFrame {
 				int size = getHeight() + e.getY();
 				if (size < 75) size = 75;
 				setSize(getWidth(), size);
+				
+				if (e.getYOnScreen() == 0)
+					toggleMax(false, maxY);
 			}
 		});
 		contentPane.add(dragDown, gbc);
@@ -305,7 +342,7 @@ public class textEditor extends JFrame {
 					edit.setForeground(Color.GRAY);
 					view.setForeground(Color.GRAY);
 				if (OnTop)
-					e.getWindow().setOpacity(0.7f);
+					e.getWindow().setOpacity(0.8f);
 			}
 		});
 		
@@ -323,11 +360,9 @@ public class textEditor extends JFrame {
 	
 	public void toggleOnTop() {
 		OnTop = !OnTop;
-		if (OnTop)
-			setAlwaysOnTop(true);
-		else
-			setAlwaysOnTop(false);
+		setAlwaysOnTop(OnTop);
 	}
+	
 	static int maxX = 0b10, maxY = 0b01;
 	public void toggleMax(boolean drag, int direction) {
 		if (!maximised) {
@@ -337,13 +372,13 @@ public class textEditor extends JFrame {
 			origY = getY();
 			switch(direction) {
 			case 0b10 : // x
-				setExtendedState( getExtendedState() | JFrame.MAXIMIZED_HORIZ );
+				setExtendedState(JFrame.MAXIMIZED_HORIZ);
 				break;
 			case 0b01 : // y
-				setExtendedState( getExtendedState() | JFrame.MAXIMIZED_VERT );
+				setExtendedState(JFrame.MAXIMIZED_VERT);
 				break;
 			case 0b11 : //  x | y
-				setExtendedState( getExtendedState() | JFrame.MAXIMIZED_BOTH );
+				setExtendedState(JFrame.MAXIMIZED_BOTH);
 				break;
 			}
 			setState(JFrame.NORMAL);
@@ -438,10 +473,10 @@ public class textEditor extends JFrame {
 	public void SaveAs() {
 		if (OnTop)
 			setAlwaysOnTop(false);
-		FileDialog dialog = new FileDialog(this, "Save", FileDialog.SAVE);
+		FileDialog dialog = new FileDialog(this, "Save as", FileDialog.SAVE);
 		dialog.setVisible(true);
-		filePath = dialog.getDirectory() + dialog.getFile();
 		if (dialog.getFile() != null) {
+			filePath = dialog.getDirectory() + dialog.getFile();
 			FileWriter fw;
 			try {
 				File file = new File(filePath);
@@ -462,7 +497,7 @@ public class textEditor extends JFrame {
 	public static void main(String[] args) {
 		SwingUtilities.invokeLater(new Runnable() {
 			public void run() {
-				textEditor jte = new textEditor();
+				new textEditor();
 			}
 		});
 	}
