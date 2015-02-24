@@ -274,7 +274,7 @@ public class textEditor extends JFrame {
 				if (size < 75) size = 75;
 				setSize(getWidth(), size);
 				
-				if (e.getYOnScreen() == 0)
+				if (e.getYOnScreen() >= Toolkit.getDefaultToolkit().getScreenSize().height-1)
 					toggleMax(false, maxY);
 			}
 		});
