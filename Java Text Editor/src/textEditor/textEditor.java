@@ -15,8 +15,11 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FileDialog;
 import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.GraphicsConfiguration;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -25,6 +28,7 @@ import java.awt.event.MouseListener;
 import java.awt.event.MouseMotionListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
+import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -32,7 +36,9 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.URL;
 
+import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.JCheckBoxMenuItem;
@@ -45,8 +51,13 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JTextPane;
+import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.undo.UndoManager;
+
+import sun.java2d.SunGraphicsEnvironment;
 
 public class textEditor extends JFrame {
 	private static final long serialVersionUID = 1L;
@@ -63,6 +74,7 @@ public class textEditor extends JFrame {
 	private JLabel XButton, MinButton, MaxButton;
 	
 	private JTextPane text;
+	private JTextPane lineNumber;
 	private Font font = new Font("Verdana", 0, 14);
 	
 	private UndoManager undo = new UndoManager();
@@ -74,15 +86,31 @@ public class textEditor extends JFrame {
 	double width = screenSize.getWidth();
 	double height = screenSize.getHeight();
 	
+	private BufferedImage icon = new BufferedImage(256, 256, BufferedImage.TYPE_INT_ARGB);
+	
 	public textEditor() {
 		super("Java Text Editor");
+		
+		try {
+			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+		} catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {
+			e.printStackTrace();
+		}
+		
+		try {
+			icon = ImageIO.read(new URL("http://pauillac.inria.fr/~harley/pics/square.gif"));
+			setIconImage(icon);
+		} catch (IOException e) {
+			System.out.println("Image could not be loaded!");
+		}
+		
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setTitle(title);
 		setUndecorated(true);
 		
 		bar = new JMenuBar();
 		bar.setBorder(BorderFactory.createTitledBorder(null, title, 2, 3, font, Color.BLACK));
-		bar.setBackground(new Color(0xFFFFFF));
+		bar.setBackground(Color.WHITE);
 		setJMenuBar(bar);
 		
 		bar.addMouseListener(new MouseListener() {
@@ -96,7 +124,7 @@ public class textEditor extends JFrame {
 				yoffScreen = e.getYOnScreen();
 			}
 			public void mouseReleased(MouseEvent e) {
-				if (e.getYOnScreen() == 0)
+				if (e.getYOnScreen() <= 3)
 					toggleMax(false, maxX | maxY);
 				if (getY() < 0) setLocation(getX(), 0);
 			}
@@ -169,10 +197,13 @@ public class textEditor extends JFrame {
 		
 		New = new JMenuItem("New"); file.add(New);  //File Items
 		New.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent e) { New(); } });
+		New.setAccelerator(KeyStroke.getKeyStroke('N', Toolkit.getDefaultToolkit ().getMenuShortcutKeyMask()));
 		Open = new JMenuItem("Open"); file.add(Open);
 		Open.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent e) { Open(); } });
+		Open.setAccelerator(KeyStroke.getKeyStroke('O', Toolkit.getDefaultToolkit ().getMenuShortcutKeyMask()));
 		Save = new JMenuItem("Save"); file.add(Save);
 		Save.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent e) { Save(); } });
+		Save.setAccelerator(KeyStroke.getKeyStroke('S', Toolkit.getDefaultToolkit ().getMenuShortcutKeyMask()));
 		SaveAs = new JMenuItem("Save As"); file.add(SaveAs);
 		SaveAs.addActionListener(new ActionListener() { public void actionPerformed(ActionEvent e) { SaveAs(); } });
 		
@@ -185,6 +216,7 @@ public class textEditor extends JFrame {
 					Toolkit.getDefaultToolkit().beep();
 			}
 		});
+		Undo.setAccelerator(KeyStroke.getKeyStroke('Z', Toolkit.getDefaultToolkit ().getMenuShortcutKeyMask()));
 		Redo = new JMenuItem("Redo"); edit.add(Redo);
 		Redo.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
@@ -194,6 +226,7 @@ public class textEditor extends JFrame {
 					Toolkit.getDefaultToolkit().beep();
 			}
 		});
+		Redo.setAccelerator(KeyStroke.getKeyStroke('Y', Toolkit.getDefaultToolkit ().getMenuShortcutKeyMask()));
 		//edit.add(new JSeparator());
 		
 		onTop = new JCheckBoxMenuItem("Always On Top"); view.add(onTop); //View Items
@@ -213,17 +246,52 @@ public class textEditor extends JFrame {
 		gbc.weightx = 1;
 		gbc.weighty = 1;
 		
+		final JPanel noWrap = new JPanel(new BorderLayout());
+		JScrollPane scroll = new JScrollPane(noWrap);
+		scroll.setBorder(null);
 		text = new JTextPane();
+		noWrap.add(text, BorderLayout.CENTER);
 		text.setFont(font);
 		text.setBackground(new Color(0xFEFEFE));
 		text.setForeground(new Color(0));
-		JPanel noWrap = new JPanel(new BorderLayout());
-		noWrap.add(text, BorderLayout.CENTER);
-		JScrollPane scroll = new JScrollPane(noWrap);
-		scroll.setBorder(null);
 		contentPane.add(scroll, gbc);
-		
 	    text.getDocument().addUndoableEditListener(undo);
+	    
+	    Thread lineNum = new Thread(new Runnable() {
+	    	public void run() {
+	    		lineNumber = new JTextPane() {
+					private static final long serialVersionUID = 1L;
+					public void paintComponent(Graphics g) {
+	    				super.paintComponent(g);
+	    				g.setColor(Color.LIGHT_GRAY);
+	    				g.fillRect(lineNumber.getWidth()-1, 0, 1, lineNumber.getHeight());
+	    			}
+	    		};
+	    		lineNumber.setFocusable(false);
+	    		lineNumber.setEditable(false);
+	    		lineNumber.setFont(font);
+	    		noWrap.add(lineNumber, BorderLayout.WEST);
+	    		lineNumber.setText("0");
+	    		int lastLines = 0;
+	    		while(true) {
+	    			String[] lines = text.getText().split("\n");
+	    			if (lastLines != lines.length) {
+	    				System.out.println("Updated line nums");
+	    				String nums = "0";
+	    				if (lastLines < lines.length) {
+	    					nums = lineNumber.getText();
+	    					for (int i = lastLines+1; i < lines.length+1; i++)
+	    						nums += "\n" + i;
+	    				} else
+	    					for (int i = 1; i < lines.length+1; i++)
+	    						nums += "\n" + i;
+	    				lineNumber.setText(nums);
+	    				lastLines = lines.length;
+	    			}
+	    		}
+	    	}
+	    });
+	    lineNum.start();
 		
 		gbc.gridx = 0;
 		gbc.gridy = 1;
@@ -378,6 +446,9 @@ public class textEditor extends JFrame {
 				setExtendedState(JFrame.MAXIMIZED_VERT);
 				break;
 			case 0b11 : //  x | y
+				GraphicsConfiguration config = getGraphicsConfiguration();
+				Rectangle usableBounds = SunGraphicsEnvironment.getUsableBounds(config.getDevice());
+				setMaximizedBounds(usableBounds);
 				setExtendedState(JFrame.MAXIMIZED_BOTH);
 				break;
 			}
