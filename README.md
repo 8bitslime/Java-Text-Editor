@@ -7,6 +7,7 @@ A very simple text editor in Java just as a little side project.
 <li> Always On Top mode </li>
   <ul> <li> Goes semi-opaue when unfocused </li> </ul>
 <li> Snazzy new border with all default controls added in </li>
-<ul> <li> Looks cool </li>
-     <li> Works the same as default Windows borders (Not too sure for any other OS) </li> </ul>
+<ul> <li> Looks cool (What more could you want?) </li>
+     <li> Works the same as default Windows borders (Not too sure for any other OS) </li> 
+     <li> Line numbers </li> </ul>
 </ul>
